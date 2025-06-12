@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>COI Downloader</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <nav class="navbar">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="gallery.html">Gallery</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <h2>📥 Download Uploaded Images</h2>
+  <div id="imageLinks">Loading...</div>
+  <button onclick="downloadAll()">⬇️ Download All</button>
+
+  <h3>📊 CSV Reports</h3>
+  <div id="csvLinks">Loading...</div>
+
+  <script>
+    const REPO_OWNER = 'AlwaysTasty';
+    const REPO_NAME = 'COIuploader';
+    const BRANCH = 'main';
+
+    let fileList = [];
+
+    async function loadImages() {
+      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/uploads`);
+      const container = document.getElementById('imageLinks');
+
+      if (!res.ok) {
+        const err = await res.json();
+        container.textContent = `❌ Failed to load: ${err.message}`;
+        return;
+      }
+
+      fileList = await res.json();
+
+      if (fileList.length === 0) {
+        container.textContent = 'No images found.';
+        return;
+      }
+
+      container.innerHTML = '';
+      fileList.forEach(file => {
+        const a = document.createElement('a');
+        a.href = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/uploads/${file.name}`;
+        a.download = file.name;
+        a.textContent = `⬇️ ${file.name}`;
+        container.appendChild(a);
+      });
+    }
+
+    async function downloadAll() {
+      if (fileList.length === 0) {
+        alert("No files to download.");
+        return;
+      }
+
+      for (const file of fileList) {
+        const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/uploads/${file.name}`;
+
+        try {
+          const response = await fetch(rawUrl);
+          const blob = await response.blob();
+
+          const blobUrl = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = file.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(blobUrl);
+
+          await new Promise(r => setTimeout(r, 500));
+        } catch (err) {
+          console.error(`❌ Failed to download ${file.name}:`, err);
+        }
+      }
+    }
+
+    async function loadCSVs() {
+      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/data`);
+      const container = document.getElementById('csvLinks');
+
+      if (!res.ok) {
+        const err = await res.json();
+        container.textContent = `❌ Failed to load CSVs: ${err.message}`;
+        return;
+      }
+
+      const csvList = await res.json();
+      const filteredCSVs = csvList.filter(file => file.name.startsWith('report') || file.name.startsWith('shift'));
+
+      if (filteredCSVs.length === 0) {
+        container.textContent = 'No CSV reports found.';
+        return;
+      }
+
+      container.innerHTML = '';
+      for (const file of filteredCSVs) {
+        const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/data/${file.name}`;
+        const response = await fetch(rawUrl);
+        const text = await response.text();
+        const rows = text.trim().split('\n').map(line => line.split(','));
+
+        const table = document.createElement('table');
+        rows.forEach((row, index) => {
+          const tr = document.createElement('tr');
+          row.forEach(cell => {
+            const el = document.createElement(index === 0 ? 'th' : 'td');
+            el.textContent = cell;
+            tr.appendChild(el);
+          });
+          table.appendChild(tr);
+        });
+
+        const title = document.createElement('h4');
+        title.textContent = file.name;
+        container.appendChild(title);
+        container.appendChild(table);
+      }
+    }
+
+    loadImages();
+    loadCSVs();
+  </script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Multi Image Uploader</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h2>📤 Upload Multiple Images</h2>
+  <input type="file" id="imageInput" accept="image/*" multiple>
+  <h1></h1>
+  <button onclick="uploadImages()">Upload Images</button>
+  <div id="previewContainer"></div>
+  <div id="status"></div>
+
+  <script>
+    const GITHUB_TOKEN = '';
+    const REPO_OWNER = 'AlwaysTasty';
+    const REPO_NAME = 'COIuploader';
+    const BRANCH = 'main';
+
+    document.getElementById('imageInput').addEventListener('change', handlePreview);
+
+    function handlePreview() {
+      const input = document.getElementById('imageInput');
+      const container = document.getElementById('previewContainer');
+      container.innerHTML = '';
+      const table = document.createElement('table');
+      const files = Array.from(input.files);
+      for (let i = 0; i < files.length; i += 3) {
+        const row = document.createElement('tr');
+        for (let j = 0; j < 3 && i + j < files.length; j++) {
+          const cell = document.createElement('td');
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(files[i + j]);
+          img.className = 'preview-image';
+          cell.appendChild(img);
+          row.appendChild(cell);
+        }
+        table.appendChild(row);
+      }
+      container.appendChild(table);
+    }
+
+    async function uploadImages() {
+      const input = document.getElementById('imageInput');
+      const files = input.files;
+      const status = document.getElementById('status');
+      if (!files.length) {
+        status.textContent = 'Please select images.';
+        return;
+      }
+
+      status.innerHTML = 'Uploading...<br>';
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const reader = new FileReader();
+
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-');
+        const fileName = `${timestamp}_${i + 1}${file.name.match(/\.\w+$/)?.[0] || '.jpg'}`;
+
+        await new Promise(resolve => {
+          reader.onloadend = async () => {
+            const base64 = reader.result.split(',')[1];
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/image/${fileName}`;
+            const res = await fetch(url, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                message: `Upload ${fileName}`,
+                content: base64,
+                branch: BRANCH
+              })
+            });
+            if (res.ok) {
+              status.innerHTML += `✅ ${fileName}<br>`;
+            } else {
+              const err = await res.json();
+              status.innerHTML += `❌ ${fileName}: ${err.message}<br>`;
+            }
+            resolve();
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+  </script>
+</body>
+</html>
