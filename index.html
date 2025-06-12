@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Returns Calculator</title>
+  <style>
+    :root {
+      --primary: #2b2d42;
+      --accent: #8d99ae;
+      --bg: #f8f9fa;
+      --card: #ffffff;
+      --border: #dee2e6;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: var(--bg);
+      color: var(--primary);
+      padding: 0 16px;
+    }
+
+    .header {
+      background: var(--primary);
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+      border-bottom: 4px solid var(--accent);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 2.5em;
+    }
+
+    .header p {
+      font-size: 1.2em;
+      margin-top: 8px;
+    }
+
+    .home-wrapper {
+      max-width: 800px;
+      margin: 30px auto;
+    }
+
+    .terminal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .terminal h2 {
+      margin-top: 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+      font-size: 1.5em;
+      color: var(--primary);
+    }
+
+    .input-group {
+      display: flex;
+      justify-content: space-between;
+      margin: 10px 0;
+    }
+
+    .input-group label {
+      flex: 1;
+      color: #333;
+    }
+
+    .input-group input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 1em;
+    }
+
+    .rgc-flight-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .rgc-flight-controls input {
+      width: 60px;
+      text-align: center;
+      background-color: #f1f1f1;
+    }
+
+    button {
+      padding: 8px 16px;
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #1a1c2b;
+    }
+
+    .summary {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      margin-top: 30px;
+      font-size: 1.1em;
+    }
+
+    .summary p {
+      margin: 10px 0;
+    }
+
+    .totals {
+      margin-top: 10px;
+      font-weight: bold;
+      text-align: right;
+    }
+
+    @media (max-width: 600px) {
+      .input-group {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .input-group label, .input-group input {
+        width: 100%;
+      }
+
+      .rgc-flight-controls {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+    .nav-links {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  background: white;
+  padding: 14px 0;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: var(--primary);
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.nav-links a:hover {
+  background-color: var(--accent);
+  color: white;
+}
+
+  </style>
+</head>
+<body>
+<div class="header">
+  <h1>Returns Calculator</h1>
+  <p>What the helly</p>
+</div>
+
+<nav class="nav-links">
+  <a href="index.html">Home</a>
+  <a href="coiuploader.html">COI Uploader</a>
+  <a href="coiretriever.html">COI Retriever</a>
+  <a href="archive.html">Test Archive</a>
+</nav>
+
+  <div class="home-wrapper">
+    <div id="terminals"></div>
+
+    <div class="summary">
+      <p><strong>Total Flights:</strong> <span id="totalFlights">0</span></p>
+      <p><strong>Total Bags (All Terminals):</strong> <span id="allTotalBags">0</span></p>
+      <p><strong>Total People:</strong> <span id="allPeople">0</span></p>
+      <button onclick="copySummary()">Copy Summary</button>
+      <button onclick="downloadCSV()">Download CSV</button>
+      <button onclick="uploadCSV()">Upload CSV to GitHub</button>
+    </div>
+  </div>
+
+
+  <script>
+    const terminalData = ["1st Terminal", "2nd Terminal", "3rd Terminal"];
+    const terminalsContainer = document.getElementById('terminals');
+
+    terminalData.forEach((name, index) => {
+      const html = `
+        <div class="terminal" id="terminal${index}">
+          <h2>${name}</h2>
+          <div class="input-group"><label>BCA 1</label><input type="number" class="bca" data-terminal="${index}"></div>
+          <div class="input-group"><label>BCA 2</label><input type="number" class="bca" data-terminal="${index}"></div>
+          <div class="input-group"><label>BCA 3</label><input type="number" class="bca" data-terminal="${index}"></div>
+          <div class="input-group"><label>RGC Bags</label><input type="number" class="rgc" data-terminal="${index}"></div>
+          <div class="input-group"><label>People</label><input type="number" class="people" data-terminal="${index}"></div>
+          <div class="input-group rgc-flight-controls">
+            <label>RGC Flights</label>
+            <button onclick="adjustRgcFlight(${index}, -1)">-</button>
+            <input type="number" class="rgc-flight" data-terminal="${index}" value="0" readonly>
+            <button onclick="adjustRgcFlight(${index}, 1)">+</button>
+          </div>
+          <div class="input-group"><label>Muslim Countries</label><input type="text" class="muslim-countries" data-terminal="${index}"></div>
+          <div class="totals">Total BCA: <span id="totalBca-${index}">0</span> | Total Bags: <span id="totalBags-${index}">0</span></div>
+        </div>`;
+      terminalsContainer.insertAdjacentHTML('beforeend', html);
+    });
+
+    document.querySelectorAll('input').forEach(input => input.addEventListener('input', calculateTotals));
+
+    function adjustRgcFlight(index, delta) {
+      const input = document.querySelector(`.rgc-flight[data-terminal="${index}"]`);
+      let value = parseInt(input.value) || 0;
+      input.value = Math.max(0, value + delta);
+      calculateTotals();
+    }
+
+    function calculateTotals() {
+      let totalFlights = 0, allTotalBags = 0, allPeople = 0;
+
+      terminalData.forEach((_, i) => {
+        const bcaInputs = document.querySelectorAll(`.bca[data-terminal="${i}"]`);
+        const rgcInput = document.querySelector(`.rgc[data-terminal="${i}"]`);
+        const peopleInput = document.querySelector(`.people[data-terminal="${i}"]`);
+        const rgcFlightInput = document.querySelector(`.rgc-flight[data-terminal="${i}"]`);
+
+        let totalBca = 0;
+        bcaInputs.forEach(input => {
+          const val = parseInt(input.value);
+          if (!isNaN(val)) {
+            totalBca += val;
+            totalFlights++;
+          }
+        });
+
+        const rgcVal = parseInt(rgcInput.value) || 0;
+        const peopleVal = parseInt(peopleInput.value) || 0;
+        const rgcFlights = parseInt(rgcFlightInput.value) || 0;
+
+        totalFlights += rgcFlights;
+        const totalBags = totalBca + rgcVal;
+        allTotalBags += totalBags;
+        allPeople += peopleVal;
+
+        document.getElementById(`totalBca-${i}`).textContent = totalBca;
+        document.getElementById(`totalBags-${i}`).textContent = totalBags;
+      });
+
+      document.getElementById('totalFlights').textContent = totalFlights;
+      document.getElementById('allTotalBags').textContent = allTotalBags;
+      document.getElementById('allPeople').textContent = allPeople;
+    }
+
+    function copySummary() {
+      const flights = document.getElementById('totalFlights').textContent;
+      const bags = document.getElementById('allTotalBags').textContent;
+      const people = document.getElementById('allPeople').textContent;
+      const summary = `${flights} flights, ${bags} baggage, ${people} people`;
+
+      const textarea = document.createElement('textarea');
+      textarea.value = summary;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      try {
+        const successful = document.execCommand('copy');
+        alert(successful ? `Copied to clipboard:\n${summary}` : 'Copy failed.');
+      } catch (err) {
+        alert('Copy not supported. Please copy manually.');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    function generateCsvString() {
+      const headers = ['Terminal', 'Total Flights', 'BCA Bags', 'RGC Bags', 'People', 'Muslim Countries'];
+      let rows = [headers.join(',')];
+
+      terminalData.forEach((terminalName, i) => {
+        const bcaValues = Array.from(document.querySelectorAll(`.bca[data-terminal="${i}"]`)).map(el => parseInt(el.value) || 0);
+        const totalBca = bcaValues.reduce((a, b) => a + b, 0);
+        const rgcBags = parseInt(document.querySelector(`.rgc[data-terminal="${i}"]`).value) || 0;
+        const bcaFlights = bcaValues.filter(val => val > 0).length;
+        const rgcFlights = parseInt(document.querySelector(`.rgc-flight[data-terminal="${i}"]`).value) || 0;
+        const totalFlights = bcaFlights + rgcFlights;
+        const people = parseInt(document.querySelector(`.people[data-terminal="${i}"]`).value) || 0;
+        const muslimCountries = document.querySelector(`.muslim-countries[data-terminal="${i}"]`).value || '';
+        rows.push([terminalName, totalFlights, totalBca, rgcBags, people, `"${muslimCountries}"`].join(','));
+      });
+
+      return rows.join('\n');
+    }
+
+    function downloadCSV() {
+      const csvContent = generateCsvString();
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const filename = `report-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function uploadCSV() {
+      const csvContent = generateCsvString();
+      const base64Content = btoa(unescape(encodeURIComponent(csvContent)));
+      const now = new Date();
+      const filename = `report-${now.toISOString().replace(/[:.]/g, '-')}.csv`;
+      const path = `data/${filename}`;
+
+      const token = 'YOUR_GITHUB_TOKEN_HERE'; // 🔒 Replace in production
+      const repo = 'COIuploader';
+      const owner = 'AlwaysTasty';
+      const branch = 'main';
+
+      let sha;
+      const checkRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (checkRes.ok) {
+        const data = await checkRes.json();
+        sha = data.sha;
+      }
+
+      const uploadRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: 'Upload terminal report CSV',
+          content: base64Content,
+          branch: branch,
+          ...(sha && { sha })
+        })
+      });
+
+      if (uploadRes.ok) {
+        alert('CSV uploaded to GitHub!');
+      } else {
+        const error = await uploadRes.json();
+        console.error(error);
+        alert('Upload failed. See console for details.');
+      }
+    }
+  </script>
+</body>
+</html>
