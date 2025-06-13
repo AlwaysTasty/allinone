@@ -7,46 +7,84 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h2>📤 Upload Multiple Images</h2>
+<div class="header">
+  <h1>COI Image Uploader</h1>
+<label for="tokenInput">GitHub Token:</label>
+  <input type="password" id="tokenInput" placeholder="Enter GitHub Token" oninput="storeToken()">
+  <button onclick="clearToken()">Clear Token</button>
+</div>
+
+<nav class="nav-links">
+  <a href="index.html">Home</a>
+  <a href="upload.html">COI Uploader</a>
+  <a href="download.html">COI Retriever</a>
+  <a href="archive.html">Archive</a>
+  <a href="upload2.html">Uploader</a>
+</nav>
+
   <input type="file" id="imageInput" accept="image/*" multiple>
-  <h1></h1>
   <button onclick="uploadImages()">Upload Images</button>
+
   <div id="previewContainer"></div>
   <div id="status"></div>
 
   <script>
-    const GITHUB_TOKEN = '';
     const REPO_OWNER = 'AlwaysTasty';
-    const REPO_NAME = 'COIuploader';
+    const REPO_NAME = 'allinone';
     const BRANCH = 'main';
 
-    document.getElementById('imageInput').addEventListener('change', handlePreview);
+    function getToken() {
+      return localStorage.getItem('githubToken') || '';
+    }
 
-    function handlePreview() {
-      const input = document.getElementById('imageInput');
+    function storeToken() {
+      const token = document.getElementById('tokenInput').value;
+      localStorage.setItem('githubToken', token);
+    }
+
+    function clearToken() {
+      localStorage.removeItem('githubToken');
+      document.getElementById('tokenInput').value = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('tokenInput').value = getToken();
+    });
+
+    document.getElementById('imageInput').addEventListener('change', previewImages);
+
+    function previewImages() {
       const container = document.getElementById('previewContainer');
       container.innerHTML = '';
+      const files = document.getElementById('imageInput').files;
+
+      if (!files.length) return;
+
       const table = document.createElement('table');
-      const files = Array.from(input.files);
-      for (let i = 0; i < files.length; i += 3) {
-        const row = document.createElement('tr');
-        for (let j = 0; j < 3 && i + j < files.length; j++) {
-          const cell = document.createElement('td');
-          const img = document.createElement('img');
-          img.src = URL.createObjectURL(files[i + j]);
-          img.className = 'preview-image';
-          cell.appendChild(img);
-          row.appendChild(cell);
-        }
-        table.appendChild(row);
-      }
+      let row;
+      Array.from(files).forEach((file, index) => {
+        if (index % 3 === 0) row = table.insertRow();
+        const cell = row.insertCell();
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.style.width = '100px';
+        img.style.height = '100px';
+        img.style.objectFit = 'cover';
+        cell.appendChild(img);
+      });
       container.appendChild(table);
     }
 
     async function uploadImages() {
+      const token = getToken();
+      const status = document.getElementById('status');
+      if (!token) {
+        status.textContent = '❌ GitHub token not provided!';
+        return;
+      }
+
       const input = document.getElementById('imageInput');
       const files = input.files;
-      const status = document.getElementById('status');
       if (!files.length) {
         status.textContent = 'Please select images.';
         return;
@@ -57,19 +95,17 @@
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const reader = new FileReader();
-
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-');
-        const fileName = `${timestamp}_${i + 1}${file.name.match(/\.\w+$/)?.[0] || '.jpg'}`;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `${timestamp}_${i + 1}${file.name.match(/\.[^.]+$/)?.[0] || '.jpg'}`;
 
         await new Promise(resolve => {
           reader.onloadend = async () => {
             const base64 = reader.result.split(',')[1];
-            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/image/${fileName}`;
+            const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/images/${fileName}`;
             const res = await fetch(url, {
               method: 'PUT',
               headers: {
-                'Authorization': `token ${GITHUB_TOKEN}`,
+                'Authorization': `token ${token}`,
                 'Content-Type': 'application/json'
               },
               body: JSON.stringify({
@@ -78,6 +114,7 @@
                 branch: BRANCH
               })
             });
+
             if (res.ok) {
               status.innerHTML += `✅ ${fileName}<br>`;
             } else {
