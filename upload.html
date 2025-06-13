@@ -15,11 +15,11 @@
 </div>
 
 <nav class="nav-links">
-  <a href="index.html">Home</a>
-  <a href="upload.html">COI Uploader</a>
-  <a href="download.html">COI Retriever</a>
-  <a href="archive.html">Archive</a>
-  <a href="upload2.html">Uploader</a>
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="upload.html" class="nav-link">COI Uploader</a>
+  <a href="download.html" class="nav-link">COI Retriever</a>
+  <a href="archive.html" class="nav-link">Archive</a>
+  <div class="nav-indicator"></div>
 </nav>
 
   <input type="file" id="imageInput" accept="image/*" multiple>
@@ -128,5 +128,31 @@
       }
     }
   </script>
+
+<script>
+  const navLinks = document.querySelectorAll('.nav-link');
+  const indicator = document.querySelector('.nav-indicator');
+
+  function updateIndicator(link) {
+    const rect = link.getBoundingClientRect();
+    const navRect = link.parentElement.getBoundingClientRect();
+
+    indicator.style.width = `${rect.width}px`;
+    indicator.style.left = `${rect.left - navRect.left}px`;
+  }
+
+  navLinks.forEach(link => {
+    link.addEventListener('mouseenter', () => updateIndicator(link));
+  });
+
+  // Highlight based on current page
+  window.addEventListener('DOMContentLoaded', () => {
+    const active = Array.from(navLinks).find(link =>
+      link.href === window.location.href
+    ) || navLinks[0];
+    updateIndicator(active);
+  });
+</script>
+
 </body>
 </html>

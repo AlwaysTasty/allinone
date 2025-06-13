@@ -135,31 +135,6 @@ button:hover {
   }
 }
 
-.nav-links {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  background: white;
-  padding: 14px 0;
-  margin-bottom: 30px;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-
-.nav-links a {
-  text-decoration: none;
-  color: var(--primary);
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 8px;
-  transition: background 0.2s ease, color 0.2s ease;
-}
-
-.nav-links a:hover {
-  background-color: var(--accent);
-  color: white;
-}
-
 #status {
   margin-top: 20px;
   font-weight: bold;
@@ -171,4 +146,36 @@ button:hover {
   margin: 5px;
   border: 1px solid #ccc;
   object-fit: cover;
+}
+
+.nav-bar {
+  position: relative;
+  display: flex;
+  justify-content: space-around;
+  background-color: #f2f2f2;
+  padding: 10px 0;
+  border-bottom: 2px solid #ccc;
+}
+
+.nav-link {
+  position: relative;
+  padding: 10px 20px;
+  text-decoration: none;
+  color: #333;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+  color: #4CAF50;
+}
+
+.nav-indicator {
+  position: absolute;
+  bottom: 0;
+  height: 3px;
+  width: 0;
+  background-color: #4CAF50;
+  transition: left 0.4s ease, width 0.4s ease;
+  border-radius: 3px;
 }

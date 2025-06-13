@@ -1,20 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>COI Downloader</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Multi Image Uploader</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <nav class="navbar">
-      <a href="index.html">Home</a>
-      <a href="about.html">About</a>
-      <a href="gallery.html">Gallery</a>
-      <a href="contact.html">Contact</a>
-    </nav>
-  </header>
+<div class="header">
+  <h1>COI Image Uploader</h1>
+<label for="tokenInput">GitHub Token:</label>
+  <input type="password" id="tokenInput" placeholder="Enter GitHub Token" oninput="storeToken()">
+  <button onclick="clearToken()">Clear Token</button>
+</div>
+
+<nav class="nav-links">
+  <a href="index.html" class="nav-link">Home</a>
+  <a href="upload.html" class="nav-link">COI Uploader</a>
+  <a href="download.html" class="nav-link">COI Retriever</a>
+  <a href="archive.html" class="nav-link">Archive</a>
+  <div class="nav-indicator"></div>
+</nav>
+
 
   <h2>📥 Download Uploaded Images</h2>
   <div id="imageLinks">Loading...</div>
@@ -25,13 +32,13 @@
 
   <script>
     const REPO_OWNER = 'AlwaysTasty';
-    const REPO_NAME = 'COIuploader';
+    const REPO_NAME = 'allinone';
     const BRANCH = 'main';
 
     let fileList = [];
 
     async function loadImages() {
-      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/uploads`);
+      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/uploads`);
       const container = document.getElementById('imageLinks');
 
       if (!res.ok) {
@@ -132,5 +139,50 @@
     loadImages();
     loadCSVs();
   </script>
+
+<script>
+  const navLinks = document.querySelectorAll('.nav-link');
+  const indicator = document.querySelector('.nav-indicator');
+
+  function updateIndicator(link) {
+    const rect = link.getBoundingClientRect();
+    const navRect = link.parentElement.getBoundingClientRect();
+
+    indicator.style.width = `${rect.width}px`;
+    indicator.style.left = `${rect.left - navRect.left}px`;
+  }
+
+  // On link click, store the page in localStorage
+  navLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      localStorage.setItem('activePage', link.dataset.page);
+    });
+  });
+
+  // On load, use current page OR fallback to localStorage value
+  window.addEventListener('DOMContentLoaded', () => {
+    let activeLink = Array.from(navLinks).find(link => {
+      return window.location.pathname.includes(link.getAttribute('href'));
+    });
+
+    if (!activeLink) {
+      const savedPage = localStorage.getItem('activePage');
+      activeLink = Array.from(navLinks).find(link => link.dataset.page === savedPage);
+    }
+
+    if (!activeLink) activeLink = navLinks[0];
+
+    updateIndicator(activeLink);
+  });
+
+  // On resize, recalculate
+  window.addEventListener('resize', () => {
+    const currentPage = localStorage.getItem('activePage');
+    const activeLink = Array.from(navLinks).find(link => link.dataset.page === currentPage);
+    if (activeLink) updateIndicator(activeLink);
+  });
+</script>
+
+
 </body>
 </html>
