@@ -4,30 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Returns Calculator</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: Arial, sans-serif; background: #f9f9f9; color: #333; }
-    .header, nav { padding: 1em; background: #222; color: white; }
-    .header h1 { margin: 0 0 0.5em 0; }
-    .header input, .header button { margin: 0.2em 0.5em 0.2em 0; }
-
-    nav.nav-links { display: flex; gap: 1em; position: relative; }
-    .nav-link { color: white; text-decoration: none; padding: 0.5em; position: relative; z-index: 1; }
-    .nav-link:hover { background: #444; border-radius: 5px; }
-    .nav-indicator { position: absolute; bottom: 0; height: 2px; background: #0bf; transition: all 0.3s ease; z-index: 0; }
-
-    .home-wrapper { padding: 1em; }
-    .terminal { border: 1px solid #ccc; border-radius: 8px; padding: 1em; margin-bottom: 1em; background: white; }
-    .terminal h2 { margin-top: 0; }
-    .input-group { margin: 0.5em 0; }
-    .input-group label { display: inline-block; width: 130px; }
-    .input-group input { padding: 0.2em 0.5em; width: 100px; }
-    .rgc-flight-controls input { text-align: center; width: 50px; }
-    .rgc-flight-controls button { padding: 0.3em 0.6em; }
-
-    .summary { background: white; padding: 1em; border-radius: 8px; border: 1px solid #ccc; margin-top: 1em; }
-    .summary button { margin: 0.3em 0.5em 0 0; }
-  </style>
+  <link rel="stylesheet" href ="styles.css">
 </head>
 <body>
 <div class="header">
@@ -162,29 +139,34 @@
   }
 
   function generateCsvString() {
-    const headers = ['Terminal', 'Total Flights', 'BCA Bags', 'RGC Bags', 'People', 'Muslim Countries'];
-    let rows = [headers.join(',')];
+    let csv = '';
 
     terminalData.forEach((terminalName, i) => {
-      const bcaValues = Array.from(document.querySelectorAll(`.bca[data-terminal="${i}"]`)).map(el => parseInt(el.value) || 0);
-      const totalBca = bcaValues.reduce((a, b) => a + b, 0);
+      const bcaInputs = Array.from(document.querySelectorAll(`.bca[data-terminal="${i}"]`)).map(el => parseInt(el.value) || 0);
+      const totalBca = bcaInputs.reduce((sum, val) => sum + val, 0);
+      const bcaFlights = bcaInputs.filter(val => val > 0).length;
       const rgcBags = parseInt(document.querySelector(`.rgc[data-terminal="${i}"]`).value) || 0;
-      const bcaFlights = bcaValues.filter(val => val > 0).length;
       const rgcFlights = parseInt(document.querySelector(`.rgc-flight[data-terminal="${i}"]`).value) || 0;
-      const totalFlights = bcaFlights + rgcFlights;
       const people = parseInt(document.querySelector(`.people[data-terminal="${i}"]`).value) || 0;
-      const muslimCountries = document.querySelector(`.muslim-countries[data-terminal="${i}"]`).value || '';
-      rows.push([terminalName, totalFlights, totalBca, rgcBags, people, `"${muslimCountries}"`].join(','));
+      const muslimCountries = (document.querySelector(`.muslim-countries[data-terminal="${i}"]`).value || '').replace(/\n/g, ', ');
+
+      const totalFlights = bcaFlights + rgcFlights;
+
+      csv += `=== ${terminalName} ===\n`;
+      csv += `Total Flights,BCA Total,RGC Bags,People,Muslim Countries\n`;
+      csv += `${totalFlights},${totalBca},${rgcBags},${people},"${muslimCountries}"\n\n`;
     });
 
-    return rows.join('\n');
+    return csv.trim(); // Clean trailing newline
   }
+
 
   function downloadCSV() {
     const csvContent = generateCsvString();
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    const filename = `report-${now.toISOString().split('T')[0]}.csv`; // "report-YYYY-MM-DD.csv"
     a.href = url;
     a.download = `report-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
     a.click();
@@ -194,16 +176,16 @@
   async function uploadCSV() {
     const csvContent = generateCsvString();
     const base64Content = btoa(unescape(encodeURIComponent(csvContent)));
-    const filename = `report-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+    const filename = `report-${now.toISOString().split('T')[0]}.csv`; // "report-YYYY-MM-DD.csv"
     const path = `data/${filename}`;
     const token = getToken();
 
-    const checkRes = await fetch(`https://api.github.com/repos/AlwaysTasty/allinone/contents/${path}`, {
+    const checkRes = await fetch(`https://api.github.com/repos/AlwaysTasty/allinone/contents/returns/${path}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const sha = checkRes.ok ? (await checkRes.json()).sha : undefined;
 
-    const uploadRes = await fetch(`https://api.github.com/repos/AlwaysTasty/allinone/contents/${path}`, {
+    const uploadRes = await fetch(`https://api.github.com/repos/AlwaysTasty/allinone/contents/returns/${path}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${token}`,
