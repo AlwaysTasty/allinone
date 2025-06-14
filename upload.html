@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Multi Image Uploader</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href = "styles.css">
 </head>
+
+
 <body>
-<div class="header">
-  <h1>COI Image Uploader</h1>
-<label for="tokenInput">GitHub Token:</label>
-  <input type="password" id="tokenInput" placeholder="Enter GitHub Token" oninput="storeToken()">
+  <div class="header">
+  <h1>COI Uploader</h1>
+  <label for="tokenInput">GitHub Token:</label>
+  <input type="text" id="tokenInput" placeholder="Enter GitHub Token" oninput="storeToken()">
   <button onclick="clearToken()">Clear Token</button>
 </div>
 
@@ -21,9 +23,14 @@
   <a href="archive.html" class="nav-link">Archive</a>
   <div class="nav-indicator"></div>
 </nav>
-
-  <input type="file" id="imageInput" accept="image/*" multiple>
-  <button onclick="uploadImages()">Upload Images</button>
+  <h1></h1>
+  <div class="upload-box">
+  <label for="imageInput" class="file-label">
+    📁<br> Choose Images
+    <input type="file" id="imageInput" accept="image/*" multiple hidden>
+  </label>
+  <button class="upload-btn" onclick="uploadImages()">Upload Images</button>
+  </div>
 
   <div id="previewContainer"></div>
   <div id="status"></div>
