@@ -3,14 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Multi Image Uploader</title>
+  <title>COI Downloader</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    table { border-collapse: collapse; margin-bottom: 2em; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #f5f5f5; }
+    img { max-width: 100px; height: auto; display: block; }
+  </style>
 </head>
 <body>
 <div class="header">
-  <h1>COI Image Uploader</h1>
-<label for="tokenInput">GitHub Token:</label>
-  <input type="password" id="tokenInput" placeholder="Enter GitHub Token" oninput="storeToken()">
+  <h1>COI Downloader</h1>
+  <label for="tokenInput">GitHub Token:</label>
+  <input type="text" id="tokenInput" placeholder="Enter GitHub Token" oninput="storeToken()">
   <button onclick="clearToken()">Clear Token</button>
 </div>
 
@@ -22,125 +28,128 @@
   <div class="nav-indicator"></div>
 </nav>
 
+<h3>COI Images</h3>
+<div id="imageLinks">Loading...</div>
+<button class="upload-btn" onclick="downloadAll()">Download All</button>
 
-  <h2>📥 Download Uploaded Images</h2>
-  <div id="imageLinks">Loading...</div>
-  <button onclick="downloadAll()">⬇️ Download All</button>
-
-  <h3>📊 CSV Reports</h3>
-  <div id="csvLinks">Loading...</div>
-
-  <script>
-    const REPO_OWNER = 'AlwaysTasty';
-    const REPO_NAME = 'allinone';
-    const BRANCH = 'main';
-
-    let fileList = [];
-
-    async function loadImages() {
-      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/uploads`);
-      const container = document.getElementById('imageLinks');
-
-      if (!res.ok) {
-        const err = await res.json();
-        container.textContent = `❌ Failed to load: ${err.message}`;
-        return;
-      }
-
-      fileList = await res.json();
-
-      if (fileList.length === 0) {
-        container.textContent = 'No images found.';
-        return;
-      }
-
-      container.innerHTML = '';
-      fileList.forEach(file => {
-        const a = document.createElement('a');
-        a.href = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/uploads/${file.name}`;
-        a.download = file.name;
-        a.textContent = `⬇️ ${file.name}`;
-        container.appendChild(a);
-      });
-    }
-
-    async function downloadAll() {
-      if (fileList.length === 0) {
-        alert("No files to download.");
-        return;
-      }
-
-      for (const file of fileList) {
-        const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/uploads/${file.name}`;
-
-        try {
-          const response = await fetch(rawUrl);
-          const blob = await response.blob();
-
-          const blobUrl = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = blobUrl;
-          a.download = file.name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(blobUrl);
-
-          await new Promise(r => setTimeout(r, 500));
-        } catch (err) {
-          console.error(`❌ Failed to download ${file.name}:`, err);
-        }
-      }
-    }
-
-    async function loadCSVs() {
-      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/data`);
-      const container = document.getElementById('csvLinks');
-
-      if (!res.ok) {
-        const err = await res.json();
-        container.textContent = `❌ Failed to load CSVs: ${err.message}`;
-        return;
-      }
-
-      const csvList = await res.json();
-      const filteredCSVs = csvList.filter(file => file.name.startsWith('report') || file.name.startsWith('shift'));
-
-      if (filteredCSVs.length === 0) {
-        container.textContent = 'No CSV reports found.';
-        return;
-      }
-
-      container.innerHTML = '';
-      for (const file of filteredCSVs) {
-        const rawUrl = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/data/${file.name}`;
-        const response = await fetch(rawUrl);
-        const text = await response.text();
-        const rows = text.trim().split('\n').map(line => line.split(','));
-
-        const table = document.createElement('table');
-        rows.forEach((row, index) => {
-          const tr = document.createElement('tr');
-          row.forEach(cell => {
-            const el = document.createElement(index === 0 ? 'th' : 'td');
-            el.textContent = cell;
-            tr.appendChild(el);
-          });
-          table.appendChild(tr);
-        });
-
-        const title = document.createElement('h4');
-        title.textContent = file.name;
-        container.appendChild(title);
-        container.appendChild(table);
-      }
-    }
-
-    loadImages();
-    loadCSVs();
-  </script>
+<h3>Returns</h3>
+<div id="csvLinks">Loading...</div>
 
 <script>
+  const REPO_OWNER = 'AlwaysTasty';
+  const REPO_NAME = 'allinone';
+  const BRANCH = 'main';
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  let fileList = [];
+
+  async function loadImages() {
+    const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/images?ref=${BRANCH}`);
+    const container = document.getElementById('imageLinks');
+    if (!res.ok) {
+      container.textContent = `❌ Failed to load images.`;
+      return;
+    }
+    const files = await res.json();
+    const todaysImages = files.filter(file => file.name.includes(todayStr));
+    if (todaysImages.length === 0) {
+      container.textContent = 'No images found for today.';
+      return;
+    }
+
+    const table = document.createElement('table');
+    const row = document.createElement('tr');
+    todaysImages.forEach(file => {
+      const cell = document.createElement('td');
+      const img = document.createElement('img');
+      img.src = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/images/${file.name}`;
+      img.alt = file.name;
+      const link = document.createElement('a');
+      link.href = img.src;
+      link.download = file.name;
+      link.textContent = `⬇️ ${file.name}`;
+      cell.appendChild(img);
+      cell.appendChild(link);
+      row.appendChild(cell);
+    });
+    table.appendChild(row);
+    container.innerHTML = '';
+    container.appendChild(table);
+    fileList = todaysImages;
+  }
+
+  async function downloadAll() {
+    if (fileList.length === 0) {
+      alert("No files to download.");
+      return;
+    }
+    for (const file of fileList) {
+      const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/images/${file.name}`;
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      await new Promise(r => setTimeout(r, 300));
+    }
+  }
+
+  async function loadCSV() {
+    const container = document.getElementById('csvLinks');
+    const fileName = `report-${todayStr}.csv`;
+    const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/returns/${fileName}`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Not found');
+      const text = await res.text();
+      const rows = text.trim().split('\n').map(line => line.split(','));
+      const table = document.createElement('table');
+      rows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+        row.forEach(cell => {
+          const el = document.createElement(idx === 0 ? 'th' : 'td');
+          el.textContent = cell;
+          tr.appendChild(el);
+        });
+        table.appendChild(tr);
+      });
+      container.innerHTML = '';
+      container.appendChild(table);
+    } catch (err) {
+      container.textContent = 'No CSV report found for today.';
+    }
+  }
+
+  loadImages();
+  loadCSV();
+</script>
+
+<script>
+
+  function getToken() {
+    return localStorage.getItem('githubToken') || '';
+  }
+
+  function storeToken() {
+    const token = document.getElementById('tokenInput').value;
+    localStorage.setItem('githubToken', token);
+  }
+
+  function clearToken() {
+    localStorage.removeItem('githubToken');
+    document.getElementById('tokenInput').value = '';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('tokenInput').value = getToken();
+    renderTerminals();
+  });
+
   const navLinks = document.querySelectorAll('.nav-link');
   const indicator = document.querySelector('.nav-indicator');
 
@@ -152,37 +161,18 @@
     indicator.style.left = `${rect.left - navRect.left}px`;
   }
 
-  // On link click, store the page in localStorage
   navLinks.forEach(link => {
-    link.addEventListener('click', () => {
-      localStorage.setItem('activePage', link.dataset.page);
-    });
+    link.addEventListener('mouseenter', () => updateIndicator(link));
   });
 
-  // On load, use current page OR fallback to localStorage value
+  // Highlight based on current page
   window.addEventListener('DOMContentLoaded', () => {
-    let activeLink = Array.from(navLinks).find(link => {
-      return window.location.pathname.includes(link.getAttribute('href'));
-    });
-
-    if (!activeLink) {
-      const savedPage = localStorage.getItem('activePage');
-      activeLink = Array.from(navLinks).find(link => link.dataset.page === savedPage);
-    }
-
-    if (!activeLink) activeLink = navLinks[0];
-
-    updateIndicator(activeLink);
-  });
-
-  // On resize, recalculate
-  window.addEventListener('resize', () => {
-    const currentPage = localStorage.getItem('activePage');
-    const activeLink = Array.from(navLinks).find(link => link.dataset.page === currentPage);
-    if (activeLink) updateIndicator(activeLink);
+    const active = Array.from(navLinks).find(link =>
+      link.href === window.location.href
+    ) || navLinks[0];
+    updateIndicator(active);
   });
 </script>
-
 
 </body>
 </html>
