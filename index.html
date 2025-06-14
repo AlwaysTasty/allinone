@@ -28,18 +28,19 @@
     <p><strong>Total Flights:</strong> <span id="totalFlights">0</span></p>
     <p><strong>Total Bags (All Terminals):</strong> <span id="allTotalBags">0</span></p>
     <p><strong>Total People:</strong> <span id="allPeople">0</span></p>
-    <button onclick="copySummary()">Copy Summary</button>
-    <button onclick="downloadCSV()">Download CSV</button>
-    <button onclick="uploadCSV()">Upload CSV to GitHub</button>
+    <button class="upload-btn" onclick="copySummary()">Copy Summary</button>
+    <button class="upload-btn" onclick="uploadCSV()">Upload Returns</button>
   </div>
 </div>
+
+<p id="uploadStatus" style="display:none; font-weight: bold;"></p>
 
 <script>
   const terminalData = ["1st Terminal", "2nd Terminal", "3rd Terminal"];
   const terminalsContainer = document.getElementById('terminals');
 
   const REPO_OWNER = 'AlwaysTasty';
-  const REPO_NAME = 'COIuploader';
+  const REPO_NAME = 'allinone';
   const BRANCH = 'main';
 
   function getToken() {
@@ -59,7 +60,6 @@
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tokenInput').value = getToken();
     renderTerminals();
-    setupNavIndicator();
   });
 
   function renderTerminals() {
@@ -161,18 +161,6 @@
   }
 
 
-  function downloadCSV() {
-    const csvContent = generateCsvString();
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const filename = `report-${now.toISOString().split('T')[0]}.csv`; // "report-YYYY-MM-DD.csv"
-    a.href = url;
-    a.download = `report-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   async function uploadCSV() {
     const csvContent = generateCsvString();
     const base64Content = btoa(unescape(encodeURIComponent(csvContent)));
@@ -203,19 +191,68 @@
     else alert('Upload failed. See console for details.');
   }
 
-  function setupNavIndicator() {
-    const navLinks = document.querySelectorAll('.nav-link');
-    const indicator = document.querySelector('.nav-indicator');
-    const update = link => {
-      const rect = link.getBoundingClientRect();
-      const navRect = link.parentElement.getBoundingClientRect();
-      indicator.style.width = `${rect.width}px`;
-      indicator.style.left = `${rect.left - navRect.left}px`;
-    };
-    navLinks.forEach(link => link.addEventListener('mouseenter', () => update(link)));
-    const active = Array.from(navLinks).find(link => link.href === window.location.href) || navLinks[0];
-    update(active);
+  function setUploadStatus(message, isSuccess = null) {
+    const statusEl = document.getElementById('uploadStatus');
+    statusEl.textContent = message;
+    statusEl.style.display = 'block';
+    statusEl.style.color = isSuccess === null ? 'black' : isSuccess ? 'green' : 'red';
+
+    if (isSuccess !== null) {
+      setTimeout(() => statusEl.style.display = 'none', 4000);
+    }
   }
+
+  async function uploadCSV() {
+    const csvContent = generateCsvString();
+    const base64Content = btoa(unescape(encodeURIComponent(csvContent)));
+    const now = new Date(); // 🧠 You were missing this
+    const filename = `report-${now.toISOString().split('T')[0]}.csv`;
+    const path = `${filename}`;
+    const token = getToken();
+
+    if (!token) {
+      alert('Missing GitHub token!');
+      return;
+    }
+
+    setUploadStatus('Uploading returns...', null);
+
+    try {
+      // Check if file exists to get its sha
+      const checkRes = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/returns/${path}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      const sha = checkRes.ok ? (await checkRes.json()).sha : undefined;
+
+      const uploadRes = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/returns/${path}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: 'Upload terminal report CSV',
+          content: base64Content,
+          branch: BRANCH,
+          ...(sha && { sha })
+        })
+      });
+
+      if (uploadRes.ok) {
+        setUploadStatus('✅ Upload successful!', true);
+      } else {
+        const err = await uploadRes.json();
+        console.error('Upload failed:', err);
+        setUploadStatus('❌ Upload failed. Check console.', false);
+      }
+    } catch (err) {
+      console.error('Upload exception:', err);
+      setUploadStatus('❌ Upload crashed. Check console.', false);
+    }
+  }
+
+
 </script>
 </body>
 </html>
