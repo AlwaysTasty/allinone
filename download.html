@@ -47,7 +47,7 @@
     const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/images?ref=${BRANCH}`);
     const container = document.getElementById('imageLinks');
     if (!res.ok) {
-      container.textContent = `❌ Failed to load images.`;
+      container.textContent = `Failed to load images.`;
       return;
     }
     const files = await res.json();
@@ -121,7 +121,7 @@
       container.innerHTML = '';
       container.appendChild(table);
     } catch (err) {
-      container.textContent = 'No CSV report found for today.';
+      container.textContent = 'No returns yet for today';
     }
   }
 
