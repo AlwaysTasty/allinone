@@ -14,19 +14,20 @@
     #file-explorer-container {
       display: flex;
       gap: 20px;
-      height: calc(100vh - 220px); /* Adjust based on your header/nav height */
-      min-height: 400px;
+      /* --- MODIFIED: Reduced height and added a min-height --- */
+      height: 65vh; 
+      min-height: 500px;
     }
     #file-list-panel {
-      flex: 1;
-      min-width: 250px;
+      flex: 1.2; /* Adjusted flex for new columns */
+      min-width: 350px;
       overflow-y: auto;
       border: 1px solid #e0e0e0;
       border-radius: 8px;
       background-color: #fff;
     }
     #file-preview-panel {
-      flex: 2.5;
+      flex: 2;
       border: 1px solid #e0e0e0;
       border-radius: 8px;
       overflow: auto;
@@ -45,8 +46,9 @@
       text-align: left;
       padding: 12px 15px;
       border-bottom: 1px solid #eee;
+      white-space: nowrap;
     }
-    #fileTable thead th {
+    #fileTable th {
       position: sticky;
       top: 0;
       background-color: #f8f8f8;
@@ -64,6 +66,26 @@
       background-color: #e9f2ff;
       color: #0056b3;
     }
+    /* --- NEW: Styles for the download button and date --- */
+    .date-loading {
+      color: #999;
+      font-style: italic;
+    }
+    .download-btn {
+      padding: 5px 10px;
+      font-size: 0.8rem;
+      background-color: #28a745;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    .download-btn:hover {
+      background-color: #218838;
+    }
+    td.actions-cell {
+      text-align: center;
+    }
     #status-message {
       text-align: center;
       padding: 20px;
@@ -72,6 +94,7 @@
     #preview-placeholder {
       color: #aaa;
       font-size: 1.2em;
+      text-align: center;
     }
     #preview-content {
       width: 100%;
@@ -101,19 +124,6 @@
         margin-bottom: 15px;
         text-align: center;
     }
-    .download-link {
-        display: inline-block;
-        padding: 10px 20px;
-        background-color: #007bff;
-        color: white;
-        text-decoration: none;
-        border-radius: 5px;
-        font-weight: 500;
-        transition: background-color 0.3s;
-    }
-    .download-link:hover {
-        background-color: #0056b3;
-    }
   </style>
 </head>
 <body>
@@ -139,6 +149,8 @@
             <tr>
               <th>Name</th>
               <th>Size</th>
+              <th>Upload Date</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="file-list-body">
@@ -168,13 +180,13 @@
   function storeToken() {
     const token = document.getElementById('tokenInput').value;
     localStorage.setItem('githubToken', token);
-    renderFileExplorer(); // Re-render when token changes
+    renderFileExplorer();
   }
 
   function clearToken() {
     localStorage.removeItem('githubToken');
     document.getElementById('tokenInput').value = '';
-    renderFileExplorer(); // Re-render to show token needed message
+    renderFileExplorer();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -199,11 +211,9 @@
   window.addEventListener('DOMContentLoaded', () => {
     const active = Array.from(navLinks).find(link =>
       window.location.href.includes(link.href.split('/').pop())
-    ) || navLinks[3]; // Default to "Files" link
+    ) || navLinks[3];
     updateIndicator(active);
   });
-
-  // --- New File Explorer Logic ---
 
   const fileListBody = document.getElementById('file-list-body');
   const statusMessage = document.getElementById('status-message');
@@ -229,16 +239,34 @@
       div.textContent = text;
       return div.innerHTML;
   }
+  
+  async function fetchCommitDate(filePath, token) {
+      const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits?path=${filePath}&per_page=1`;
+      try {
+          const response = await fetch(apiUrl, {
+              headers: { 'Authorization': `token ${token}` }
+          });
+          if (!response.ok) return "N/A";
+          const commits = await response.json();
+          if (commits.length > 0) {
+              const commitDate = commits[0].commit.committer.date;
+              return new Date(commitDate).toLocaleDateString();
+          }
+          return "N/A";
+      } catch (error) {
+          console.error(`Error fetching date for ${filePath}:`, error);
+          return "Error";
+      }
+  }
 
   async function previewFile(file) {
-      // Highlight selected row
       document.querySelectorAll('#fileTable tbody tr').forEach(r => r.classList.remove('selected'));
       document.querySelector(`[data-sha="${file.sha}"]`).classList.add('selected');
 
       previewPlaceholder.style.display = 'none';
       previewContent.style.display = 'block';
       previewContent.innerHTML = `<div class="preview-header">Loading ${file.name}...</div>`;
-
+      
       const extension = file.name.split('.').pop().toLowerCase();
       const textExtensions = ['txt', 'md', 'json', 'js', 'css', 'html', 'xml', 'csv', 'py', 'java', 'c', 'cpp', 'sh'];
       const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'];
@@ -248,18 +276,45 @@
       } else if (textExtensions.includes(extension)) {
           try {
               const response = await fetch(file.download_url);
+              if (!response.ok) throw new Error('Network response was not ok.');
               const text = await response.text();
               previewContent.innerHTML = `<pre><code>${escapeHtml(text)}</code></pre>`;
           } catch (error) {
-              previewContent.innerHTML = 'Error loading file content.';
+              console.error("Text Preview Error:", error);
+              previewContent.innerHTML = `<div id="preview-placeholder" style="display: block;">Error loading file content.</div>`;
           }
       } else if (extension === 'pdf') {
-          previewContent.innerHTML = `<embed src="${file.download_url}" type="application/pdf" width="100%" height="100%" />`;
+          // --- MODIFIED: Fetch PDF content as Base64 and embed as a Data URL ---
+          previewContent.innerHTML = `<div class="preview-header">Loading PDF preview...</div>`;
+          try {
+              const token = getToken();
+              // The `file.url` is the API endpoint for the file's metadata
+              const fileApiResponse = await fetch(file.url, {
+                  headers: { 'Authorization': `token ${token}` }
+              });
+              if (!fileApiResponse.ok) throw new Error('Could not fetch PDF metadata from API.');
+
+              const fileData = await fileApiResponse.json();
+              // The content is Base64 encoded. Create a Data URL.
+              const pdfDataUrl = `data:application/pdf;base64,${fileData.content}`;
+              
+              previewContent.innerHTML = `<embed src="${pdfDataUrl}" type="application/pdf" width="100%" height="100%" />`;
+          } catch (error) {
+              console.error("PDF Preview Error:", error);
+              previewContent.innerHTML = `
+                  <div id="preview-placeholder" style="display: block;">
+                      Could not load PDF preview.
+                      <br>
+                      <span style="font-size: 0.8em; color: #888;">(${escapeHtml(file.name)})</span>
+                  </div>
+              `;
+          }
       } else {
           previewContent.innerHTML = `
-              <div style="text-align: center;">
-                  <p>Preview not available for <strong>${file.name}</strong></p>
-                  <a href="${file.download_url}" class="download-link" download>Download File</a>
+              <div id="preview-placeholder" style="display: block;">
+                  This file cannot be previewed.
+                  <br>
+                  <span style="font-size: 0.8em; color: #888;">(${escapeHtml(file.name)})</span>
               </div>
           `;
       }
@@ -277,18 +332,13 @@
     try {
         const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FOLDER_PATH}?ref=${BRANCH}`;
         const response = await fetch(apiUrl, {
-            headers: {
-                'Authorization': `token ${token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
+            headers: { 'Authorization': `token ${token}` }
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to fetch files: ${response.status} ${response.statusText}`);
-        }
-
+        if (!response.ok) throw new Error(`Failed to fetch files: ${response.statusText}`);
+        
         const data = await response.json();
-        const files = data.filter(item => item.type === 'file');
+        const files = data.filter(item => item.type === 'file').sort((a,b) => a.name.localeCompare(b.name));
 
         if (files.length === 0) {
             setStatus(`No files found in the "${FOLDER_PATH}" folder.`);
@@ -296,16 +346,28 @@
         }
 
         statusMessage.style.display = 'none';
-        fileListBody.innerHTML = ''; // Clear previous list
+        fileListBody.innerHTML = '';
+        
+        const datePromises = files.map(file => fetchCommitDate(file.path, token));
+        const allDates = await Promise.all(datePromises);
 
-        files.sort((a,b) => a.name.localeCompare(b.name)).forEach(file => {
+        files.forEach((file, index) => {
             const tr = document.createElement('tr');
-            tr.dataset.sha = file.sha; // Unique identifier for selection
+            tr.dataset.sha = file.sha;
             tr.innerHTML = `
-                <td>${file.name}</td>
+                <td>${escapeHtml(file.name)}</td>
                 <td>${formatFileSize(file.size)}</td>
+                <td>${allDates[index]}</td>
+                <td class="actions-cell">
+                  <a href="${file.download_url}" class="download-btn" download="${file.name}">Download</a>
+                </td>
             `;
             tr.addEventListener('click', () => previewFile(file));
+            
+            tr.querySelector('.download-btn').addEventListener('click', (e) => {
+              e.stopPropagation();
+            });
+            
             fileListBody.appendChild(tr);
         });
 
