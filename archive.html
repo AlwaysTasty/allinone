@@ -5,6 +5,116 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Archive</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    /* New styles for the File Explorer */
+    main {
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    #file-explorer-container {
+      display: flex;
+      gap: 20px;
+      height: calc(100vh - 220px); /* Adjust based on your header/nav height */
+      min-height: 400px;
+    }
+    #file-list-panel {
+      flex: 1;
+      min-width: 250px;
+      overflow-y: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      background-color: #fff;
+    }
+    #file-preview-panel {
+      flex: 2.5;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background-color: #f9fafb;
+    }
+    #fileTable {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #fileTable th, #fileTable td {
+      text-align: left;
+      padding: 12px 15px;
+      border-bottom: 1px solid #eee;
+    }
+    #fileTable thead th {
+      position: sticky;
+      top: 0;
+      background-color: #f8f8f8;
+      font-weight: 600;
+      color: #333;
+    }
+    #fileTable tbody tr {
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    #fileTable tbody tr:hover {
+      background-color: #f5f5f5;
+    }
+    #fileTable tbody tr.selected {
+      background-color: #e9f2ff;
+      color: #0056b3;
+    }
+    #status-message {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+    #preview-placeholder {
+      color: #aaa;
+      font-size: 1.2em;
+    }
+    #preview-content {
+      width: 100%;
+      height: 100%;
+    }
+    #preview-content img, #preview-content embed, #preview-content iframe {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+      margin: auto;
+      border-radius: 4px;
+    }
+    #preview-content pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      background-color: #fff;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #e0e0e0;
+      height: 100%;
+      overflow: auto;
+      box-sizing: border-box;
+      color: #333;
+    }
+    .preview-header {
+        font-weight: bold;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+    .download-link {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: 500;
+        transition: background-color 0.3s;
+    }
+    .download-link:hover {
+        background-color: #0056b3;
+    }
+  </style>
 </head>
 <body>
 <div class="header">
@@ -18,12 +128,30 @@
   <a href="index.html" class="nav-link">Home</a>
   <a href="upload.html" class="nav-link">COI Uploader</a>
   <a href="download.html" class="nav-link">COI Retriever</a>
-  <a href="archive.html" class="nav-link">Archive</a>
+  <a href="files.html" class="nav-link">Files</a>
   <div class="nav-indicator"></div>
 </nav>
   <main>
-    <h1>Archive</h1>
-    <p>Todo</p>
+    <div id="file-explorer-container">
+      <div id="file-list-panel">
+        <table id="fileTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Size</th>
+            </tr>
+          </thead>
+          <tbody id="file-list-body">
+            <!-- File rows will be injected here by JS -->
+          </tbody>
+        </table>
+        <div id="status-message"></div>
+      </div>
+      <div id="file-preview-panel">
+        <div id="preview-placeholder">Select a file to preview</div>
+        <div id="preview-content" style="display: none;"></div>
+      </div>
+    </div>
   </main>
 
 <script>
@@ -31,6 +159,7 @@
   const REPO_OWNER = 'AlwaysTasty';
   const REPO_NAME = 'allinone';
   const BRANCH = 'main';
+  const FOLDER_PATH = 'files';
 
   function getToken() {
     return localStorage.getItem('githubToken') || '';
@@ -39,18 +168,19 @@
   function storeToken() {
     const token = document.getElementById('tokenInput').value;
     localStorage.setItem('githubToken', token);
+    renderFileExplorer(); // Re-render when token changes
   }
 
   function clearToken() {
     localStorage.removeItem('githubToken');
     document.getElementById('tokenInput').value = '';
+    renderFileExplorer(); // Re-render to show token needed message
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tokenInput').value = getToken();
-    renderTerminals();
+    renderFileExplorer();
   });
-
 
   const navLinks = document.querySelectorAll('.nav-link');
   const indicator = document.querySelector('.nav-indicator');
@@ -58,7 +188,6 @@
   function updateIndicator(link) {
     const rect = link.getBoundingClientRect();
     const navRect = link.parentElement.getBoundingClientRect();
-
     indicator.style.width = `${rect.width}px`;
     indicator.style.left = `${rect.left - navRect.left}px`;
   }
@@ -67,13 +196,124 @@
     link.addEventListener('mouseenter', () => updateIndicator(link));
   });
 
-  // Highlight based on current page
   window.addEventListener('DOMContentLoaded', () => {
     const active = Array.from(navLinks).find(link =>
-      link.href === window.location.href
-    ) || navLinks[0];
+      window.location.href.includes(link.href.split('/').pop())
+    ) || navLinks[3]; // Default to "Files" link
     updateIndicator(active);
   });
+
+  // --- New File Explorer Logic ---
+
+  const fileListBody = document.getElementById('file-list-body');
+  const statusMessage = document.getElementById('status-message');
+  const previewPlaceholder = document.getElementById('preview-placeholder');
+  const previewContent = document.getElementById('preview-content');
+
+  function setStatus(message) {
+    fileListBody.innerHTML = '';
+    statusMessage.style.display = 'block';
+    statusMessage.textContent = message;
+  }
+  
+  function formatFileSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+  }
+
+  async function previewFile(file) {
+      // Highlight selected row
+      document.querySelectorAll('#fileTable tbody tr').forEach(r => r.classList.remove('selected'));
+      document.querySelector(`[data-sha="${file.sha}"]`).classList.add('selected');
+
+      previewPlaceholder.style.display = 'none';
+      previewContent.style.display = 'block';
+      previewContent.innerHTML = `<div class="preview-header">Loading ${file.name}...</div>`;
+
+      const extension = file.name.split('.').pop().toLowerCase();
+      const textExtensions = ['txt', 'md', 'json', 'js', 'css', 'html', 'xml', 'csv', 'py', 'java', 'c', 'cpp', 'sh'];
+      const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'];
+
+      if (imageExtensions.includes(extension)) {
+          previewContent.innerHTML = `<img src="${file.download_url}" alt="${file.name}">`;
+      } else if (textExtensions.includes(extension)) {
+          try {
+              const response = await fetch(file.download_url);
+              const text = await response.text();
+              previewContent.innerHTML = `<pre><code>${escapeHtml(text)}</code></pre>`;
+          } catch (error) {
+              previewContent.innerHTML = 'Error loading file content.';
+          }
+      } else if (extension === 'pdf') {
+          previewContent.innerHTML = `<embed src="${file.download_url}" type="application/pdf" width="100%" height="100%" />`;
+      } else {
+          previewContent.innerHTML = `
+              <div style="text-align: center;">
+                  <p>Preview not available for <strong>${file.name}</strong></p>
+                  <a href="${file.download_url}" class="download-link" download>Download File</a>
+              </div>
+          `;
+      }
+  }
+
+  async function renderFileExplorer() {
+    const token = getToken();
+    if (!token) {
+        setStatus('Please enter a GitHub token to view files.');
+        return;
+    }
+
+    setStatus('Loading files...');
+    
+    try {
+        const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FOLDER_PATH}?ref=${BRANCH}`;
+        const response = await fetch(apiUrl, {
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch files: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const files = data.filter(item => item.type === 'file');
+
+        if (files.length === 0) {
+            setStatus(`No files found in the "${FOLDER_PATH}" folder.`);
+            return;
+        }
+
+        statusMessage.style.display = 'none';
+        fileListBody.innerHTML = ''; // Clear previous list
+
+        files.sort((a,b) => a.name.localeCompare(b.name)).forEach(file => {
+            const tr = document.createElement('tr');
+            tr.dataset.sha = file.sha; // Unique identifier for selection
+            tr.innerHTML = `
+                <td>${file.name}</td>
+                <td>${formatFileSize(file.size)}</td>
+            `;
+            tr.addEventListener('click', () => previewFile(file));
+            fileListBody.appendChild(tr);
+        });
+
+    } catch (error) {
+        console.error('Error fetching files:', error);
+        setStatus(`Error: ${error.message}. Check your token and repository details.`);
+    }
+  }
 
 </script>
 </body>
