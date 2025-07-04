@@ -5,31 +5,79 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Multi Image Uploader</title>
   <link rel="stylesheet" href="styles.css">
+  <!-- NEW: Styles for the preview table to make it sleek and minimalistic -->
+  <style>
+    #previewContainer {
+      margin-top: 25px;
+    }
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9em;
+    }
+    .preview-table thead th {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 2px solid #ccc;
+      background-color: #f8f9fa;
+    }
+    .preview-table tbody td {
+      padding: 8px;
+      vertical-align: middle;
+      border-bottom: 1px solid #ddd;
+    }
+    .preview-table img {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 4px;
+      display: block;
+    }
+    .preview-table input[type="date"],
+    .preview-table input[type="time"] {
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      width: 130px; /* Adjust as needed */
+    }
+    .remove-btn {
+      padding: 5px 10px;
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .remove-btn:hover {
+      background-color: #c82333;
+    }
+  </style>
 </head>
-
 
 <body>
   <div class="header">
-  <h1>COI Uploader</h1>
-  <label for="tokenInput">GitHub Token:</label>
-  <input type="text" id="tokenInput" placeholder="Enter GitHub Token" oninput="storeToken()">
-  <button onclick="clearToken()">Clear Token</button>
-</div>
+    <h1>COI Uploader</h1>
+    <label for="tokenInput">GitHub Token:</label>
+    <input type="text" id="tokenInput" placeholder="Enter GitHub Token" oninput="storeToken()">
+    <button onclick="clearToken()">Clear Token</button>
+  </div>
 
-<nav class="nav-links">
-  <a href="index.html" class="nav-link">Home</a>
-  <a href="upload.html" class="nav-link">COI Uploader</a>
-  <a href="download.html" class="nav-link">COI Retriever</a>
-  <a href="archive.html" class="nav-link">Archive</a>
-  <div class="nav-indicator"></div>
-</nav>
+  <nav class="nav-links">
+    <a href="index.html" class="nav-link">Home</a>
+    <a href="upload.html" class="nav-link">COI Uploader</a>
+    <a href="download.html" class="nav-link">COI Retriever</a>
+    <a href="archive.html" class="nav-link">Archive</a>
+    <div class="nav-indicator"></div>
+  </nav>
+
   <h1></h1>
   <div class="upload-box">
-  <label for="imageInput" class="file-label">
-    📁<br> Choose Images
-    <input type="file" id="imageInput" accept="image/*" multiple hidden>
-  </label>
-  <button class="upload-btn" onclick="uploadImages()">Upload Images</button>
+    <label for="imageInput" class="file-label">
+      📁<br> Choose Files
+      <input type="file" id="imageInput" accept="image/*,application/pdf" multiple hidden>
+    </label>
+    <button class="upload-btn" onclick="uploadFiles()">Upload Files</button>
   </div>
 
   <div id="previewContainer"></div>
@@ -56,11 +104,12 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('tokenInput').value = getToken();
+      // MODIFIED: Attach listener to the correct input ID
+      document.getElementById('imageInput').addEventListener('change', previewFiles);
     });
 
-    document.getElementById('imageInput').addEventListener('change', previewImages);
-
-    function previewImages() {
+    // --- MODIFIED: Complete overhaul of the preview function ---
+    function previewFiles() {
       const container = document.getElementById('previewContainer');
       container.innerHTML = '';
       const files = document.getElementById('imageInput').files;
@@ -68,21 +117,74 @@
       if (!files.length) return;
 
       const table = document.createElement('table');
-      let row;
+      table.className = 'preview-table';
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Preview</th>
+            <th>Original Name</th>
+            <th>Upload Date</th>
+            <th>Upload Time</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector('tbody');
+
       Array.from(files).forEach((file, index) => {
-        if (index % 3 === 0) row = table.insertRow();
-        const cell = row.insertCell();
+        const row = tbody.insertRow();
+        // Store the index to link the row back to the FileList object
+        row.dataset.fileIndex = index;
+
+        const previewCell = row.insertCell();
+        const nameCell = row.insertCell();
+        const dateCell = row.insertCell();
+        const timeCell = row.insertCell();
+        const actionCell = row.insertCell();
+
+        // Create Preview
         const img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
-        img.style.width = '100px';
-        img.style.height = '100px';
-        img.style.objectFit = 'cover';
-        cell.appendChild(img);
+        if (file.type.startsWith('image/')) {
+            img.src = URL.createObjectURL(file);
+        } else {
+            img.src = 'https://via.placeholder.com/70x70.png?text=File'; // Generic file icon
+        }
+        previewCell.appendChild(img);
+
+        // Set Name
+        nameCell.textContent = file.name;
+
+        // --- NEW: Date and Time pickers with current time as default ---
+        const now = new Date();
+        const defaultDate = now.toISOString().slice(0, 10); // YYYY-MM-DD
+        const defaultTime = now.toTimeString().slice(0, 5);  // HH:MM
+
+        const dateInput = document.createElement('input');
+        dateInput.type = 'date';
+        dateInput.value = defaultDate;
+        dateCell.appendChild(dateInput);
+
+        const timeInput = document.createElement('input');
+        timeInput.type = 'time';
+        timeInput.value = defaultTime;
+        timeCell.appendChild(timeInput);
+        
+        // --- NEW: Remove button ---
+        const removeButton = document.createElement('button');
+        removeButton.textContent = 'Remove';
+        removeButton.className = 'remove-btn';
+        removeButton.onclick = () => {
+            row.remove();
+        };
+        actionCell.appendChild(removeButton);
       });
+
       container.appendChild(table);
     }
 
-    async function uploadImages() {
+    // --- MODIFIED: Updated upload logic to use table data ---
+    async function uploadFiles() {
       const token = getToken();
       const status = document.getElementById('status');
       if (!token) {
@@ -90,76 +192,97 @@
         return;
       }
 
-      const input = document.getElementById('imageInput');
-      const files = input.files;
-      if (!files.length) {
-        status.textContent = 'Please select images.';
+      const originalFiles = document.getElementById('imageInput').files;
+      const previewRows = document.querySelectorAll('.preview-table tbody tr');
+
+      if (!previewRows.length) {
+        status.textContent = 'Please select files to upload.';
         return;
       }
 
       status.innerHTML = 'Uploading...<br>';
+      let successCount = 0;
+      let errorCount = 0;
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      for (const row of previewRows) {
+        const fileIndex = parseInt(row.dataset.fileIndex, 10);
+        const file = originalFiles[fileIndex];
+
+        // Get date and time from the inputs in this row
+        const dateValue = row.querySelector('input[type="date"]').value;
+        const timeValue = row.querySelector('input[type="time"]').value;
+
+        // Construct the new filename
+        const extension = file.name.match(/\.[^.]+$/)?.[0] || '.dat';
+        const fileName = `${dateValue}T${timeValue.replace(':', '-')}-00${extension}`;
+        
         const reader = new FileReader();
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileName = `${timestamp}_${i + 1}${file.name.match(/\.[^.]+$/)?.[0] || '.jpg'}`;
 
         await new Promise(resolve => {
           reader.onloadend = async () => {
             const base64 = reader.result.split(',')[1];
+            // MODIFIED: Upload to a generic 'files' folder
             const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/images/${fileName}`;
-            const res = await fetch(url, {
-              method: 'PUT',
-              headers: {
-                'Authorization': `token ${token}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                message: `Upload ${fileName}`,
-                content: base64,
-                branch: BRANCH
-              })
-            });
+            
+            try {
+              const res = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `token ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  message: `Upload ${fileName}`,
+                  content: base64,
+                  branch: BRANCH
+                })
+              });
 
-            if (res.ok) {
-              status.innerHTML += `✅ ${fileName}<br>`;
-            } else {
-              const err = await res.json();
-              status.innerHTML += `❌ ${fileName}: ${err.message}<br>`;
+              if (res.ok) {
+                status.innerHTML += `✅ ${fileName}<br>`;
+                successCount++;
+              } else {
+                const err = await res.json();
+                throw new Error(err.message);
+              }
+            } catch (error) {
+              status.innerHTML += `❌ ${fileName}: ${error.message}<br>`;
+              errorCount++;
+            } finally {
+              resolve();
             }
-            resolve();
           };
           reader.readAsDataURL(file);
         });
       }
+      status.innerHTML += `<br><b>Upload Complete.</b> Success: ${successCount}, Failed: ${errorCount}.`;
+      // Clear the preview table after upload
+      document.getElementById('previewContainer').innerHTML = '';
     }
   </script>
 
-<script>
-  const navLinks = document.querySelectorAll('.nav-link');
-  const indicator = document.querySelector('.nav-indicator');
+  <script>
+    const navLinks = document.querySelectorAll('.nav-link');
+    const indicator = document.querySelector('.nav-indicator');
 
-  function updateIndicator(link) {
-    const rect = link.getBoundingClientRect();
-    const navRect = link.parentElement.getBoundingClientRect();
+    function updateIndicator(link) {
+      const rect = link.getBoundingClientRect();
+      const navRect = link.parentElement.getBoundingClientRect();
+      indicator.style.width = `${rect.width}px`;
+      indicator.style.left = `${rect.left - navRect.left}px`;
+    }
 
-    indicator.style.width = `${rect.width}px`;
-    indicator.style.left = `${rect.left - navRect.left}px`;
-  }
+    navLinks.forEach(link => {
+      link.addEventListener('mouseenter', () => updateIndicator(link));
+    });
 
-  navLinks.forEach(link => {
-    link.addEventListener('mouseenter', () => updateIndicator(link));
-  });
-
-  // Highlight based on current page
-  window.addEventListener('DOMContentLoaded', () => {
-    const active = Array.from(navLinks).find(link =>
-      link.href === window.location.href
-    ) || navLinks[0];
-    updateIndicator(active);
-  });
-</script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const active = Array.from(navLinks).find(link =>
+        window.location.href.includes(link.href.split('/').pop())
+      ) || navLinks[1]; // Default to "COI Uploader"
+      updateIndicator(active);
+    });
+  </script>
 
 </body>
 </html>

@@ -6,10 +6,91 @@
   <title>COI Downloader</title>
   <link rel="stylesheet" href="styles.css">
   <style>
-    table { border-collapse: collapse; margin-bottom: 2em; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background: #f5f5f5; }
-    img { max-width: 100px; height: auto; display: block; }
+    /* MODIFIED: Updated styles for a sleek, iOS-inspired table */
+    .item-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 8px; /* Vertical spacing between rows */
+      margin-bottom: 1.5em;
+    }
+    .item-table th {
+      border: none;
+      padding: 12px 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #666;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    .item-table td {
+      border: none;
+      padding: 10px 15px;
+      vertical-align: middle;
+      background: #f9f9f9;
+      border-top: 1px solid #e9e9e9;
+      border-bottom: 1px solid #e9e9e9;
+    }
+    .item-table tr:hover td {
+      background: #f0f0f0;
+    }
+    .item-table td:first-child {
+      border-top-left-radius: 8px;
+      border-bottom-left-radius: 8px;
+      border-left: 1px solid #e9e9e9;
+    }
+    .item-table td:last-child {
+      border-top-right-radius: 8px;
+      border-bottom-right-radius: 8px;
+      border-right: 1px solid #e9e9e9;
+      text-align: right;
+    }
+    /* MODIFIED: Larger image previews that respect aspect ratio */
+    .item-table img {
+      max-width: 160px;
+      max-height: 120px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border-radius: 6px;
+      display: block;
+    }
+    .download-button-small {
+      padding: 6px 14px;
+      background-color: #007aff;
+      color: white;
+      text-decoration: none;
+      border-radius: 20px;
+      font-size: 0.9em;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .download-button-small:hover {
+      background-color: #0056b3;
+    }
+    .clear-button {
+      padding: 8px 16px;
+      background-color: #ff3b30;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-top: 10px;
+      display: block;
+      float: right;
+    }
+    .clear-button:hover {
+      background-color: #c53028;
+    }
+    #status-message {
+      margin-top: 1em;
+      padding: 10px;
+      border-radius: 5px;
+      display: none; /* Hidden by default */
+    }
+    .status-success { background-color: #e8f5e9; color: #2e7d32; }
+    .status-error { background-color: #ffebee; color: #c62828; }
+    .status-info { background-color: #e3f2fd; color: #1565c0; }
   </style>
 </head>
 <body>
@@ -28,54 +109,223 @@
   <div class="nav-indicator"></div>
 </nav>
 
-<h3>COI Images</h3>
+<h3>COI Images (Today & Yesterday)</h3>
 <div id="imageLinks">Loading...</div>
-<button class="upload-btn" onclick="downloadAll()">Download All</button>
+<button class="upload-btn" onclick="downloadAll()">Download All Displayed</button>
+<button class="clear-button" onclick="clearFolder('images')">Clear All Images</button>
 
-<h3>Returns</h3>
+<h3 style="clear:both; padding-top:20px;">Today's Returns</h3>
 <div id="csvLinks">Loading...</div>
+<button class="clear-button" onclick="clearFolder('returns')">Clear All Returns</button>
+
+<div id="status-message"></div>
 
 <script>
   const REPO_OWNER = 'AlwaysTasty';
   const REPO_NAME = 'allinone';
   const BRANCH = 'main';
-
-  const todayStr = new Date().toISOString().split('T')[0];
   let fileList = [];
 
-  async function loadImages() {
-    const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/images?ref=${BRANCH}`);
-    const container = document.getElementById('imageLinks');
-    if (!res.ok) {
-      container.textContent = `Failed to load images.`;
-      return;
-    }
-    const files = await res.json();
-    const todaysImages = files.filter(file => file.name.includes(todayStr));
-    if (todaysImages.length === 0) {
-      container.textContent = 'No images found for today.';
-      return;
-    }
+  function getToken() { return localStorage.getItem('githubToken') || ''; }
+  function storeToken() { localStorage.setItem('githubToken', document.getElementById('tokenInput').value); }
+  function clearToken() {
+    localStorage.removeItem('githubToken');
+    document.getElementById('tokenInput').value = '';
+  }
 
-    const table = document.createElement('table');
-    const row = document.createElement('tr');
-    todaysImages.forEach(file => {
-      const cell = document.createElement('td');
-      const img = document.createElement('img');
-      img.src = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/images/${file.name}`;
-      img.alt = file.name;
-      const link = document.createElement('a');
-      link.href = img.src;
-      link.download = file.name;
-      link.textContent = `⬇️ ${file.name}`;
-      cell.appendChild(img);
-      cell.appendChild(link);
-      row.appendChild(cell);
-    });
-    table.appendChild(row);
-    container.innerHTML = '';
-    container.appendChild(table);
-    fileList = todaysImages;
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('tokenInput').value = getToken();
+    loadImages();
+    loadCSV();
+  });
+  
+  function getFormattedDate(date) {
+    return date.toISOString().split('T')[0]; // YYYY-MM-DD
+  }
+
+  // --- MODIFIED: Filters images for today and yesterday ---
+  async function loadImages() {
+    const container = document.getElementById('imageLinks');
+    const token = getToken();
+    if (!token) {
+      container.innerHTML = '<p>Please enter a GitHub token to view images.</p>';
+      return;
+    }
+    container.innerHTML = 'Loading images...';
+    
+    try {
+      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/images?ref=${BRANCH}`, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      
+      const allFiles = (await res.json()).filter(f => f.type === 'file');
+      
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const todayStr = getFormattedDate(today);
+      const yesterdayStr = getFormattedDate(yesterday);
+
+      const recentImages = allFiles.filter(file =>
+        file.name.startsWith(todayStr) || file.name.startsWith(yesterdayStr)
+      );
+      
+      fileList = recentImages; // Update global list for Download All button
+
+      if (recentImages.length === 0) {
+        container.innerHTML = '<p>No images found from today or yesterday.</p>';
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'item-table';
+      table.innerHTML = `<thead><tr><th>Preview</th><th>Date</th><th>Time</th><th>Action</th></tr></thead>`;
+      const tbody = document.createElement('tbody');
+
+      recentImages.sort((a, b) => b.name.localeCompare(a.name)).forEach(file => { // Sort newest first
+        const row = tbody.insertRow();
+        const name = file.name;
+        let dateStr = 'N/A', timeStr = 'N/A';
+        const match = name.match(/(\d{4}-\d{2}-\d{2})T(\d{2}-\d{2}-\d{2})/);
+        if (match) {
+          dateStr = match[1];
+          timeStr = match[2].replace(/-/g, ':');
+        }
+
+        row.innerHTML = `
+          <td><img src="${file.download_url}" alt="${file.name}"></td>
+          <td>${dateStr}</td>
+          <td>${timeStr}</td>
+          <td><a href="${file.download_url}" download="${file.name}" class="download-button-small">Download</a></td>
+        `;
+      });
+
+      table.appendChild(tbody);
+      container.innerHTML = '';
+      container.appendChild(table);
+
+    } catch (error) {
+      container.innerHTML = `<p>Failed to load images. ${error.message}.</p>`;
+    }
+  }
+
+  // --- MODIFIED: Redesigned to fetch, parse, and display today's CSV in a sleek table ---
+  async function loadCSV() {
+    const container = document.getElementById('csvLinks');
+    const token = getToken();
+    if (!token) {
+      container.innerHTML = '<p>Please enter a GitHub token to view returns.</p>';
+      return;
+    }
+    container.innerHTML = 'Loading returns...';
+    
+    try {
+      const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/returns?ref=${BRANCH}`, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+      if (!res.ok) throw new Error('Could not access returns folder.');
+      
+      const allFiles = (await res.json()).filter(f => f.type === 'file' && f.name.endsWith('.csv'));
+      const todayStr = getFormattedDate(new Date());
+      const todaysCSV = allFiles.sort((a,b) => b.name.localeCompare(a.name)).find(file => file.name.startsWith(todayStr));
+
+      if (!todaysCSV) {
+        throw new Error('No returns CSV file found for today.');
+      }
+
+      const csvRes = await fetch(todaysCSV.download_url);
+      if (!csvRes.ok) throw new Error('Could not download the CSV content.');
+      
+      const csvText = await csvRes.text();
+      const rows = csvText.trim().split('\n').map(line => line.split(','));
+
+      if (rows.length === 0) throw new Error('CSV file is empty.');
+
+      const table = document.createElement('table');
+      table.className = 'item-table';
+      
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      rows[0].forEach(headerText => {
+        const th = document.createElement('th');
+        th.textContent = headerText.trim();
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      rows.slice(1).forEach(rowData => {
+        const tr = document.createElement('tr');
+        rowData.forEach(cellText => {
+          const td = document.createElement('td');
+          td.textContent = cellText.trim();
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      
+      container.innerHTML = '';
+      container.appendChild(table);
+
+    } catch (err) {
+      container.innerHTML = `<p>${err.message}</p>`;
+    }
+  }
+
+  async function clearFolder(folderPath) {
+      const token = getToken();
+      const statusDiv = document.getElementById('status-message');
+      if (!token) {
+          statusDiv.textContent = 'A GitHub token is required to delete files.';
+          statusDiv.className = 'status-error';
+          statusDiv.style.display = 'block';
+          return;
+      }
+      if (!confirm(`Are you sure you want to permanently delete all files in the "/${folderPath}" folder?`)) {
+          return;
+      }
+
+      statusDiv.textContent = `Clearing files from /${folderPath}...`;
+      statusDiv.className = 'status-info';
+      statusDiv.style.display = 'block';
+
+      try {
+          const res = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${folderPath}?ref=${BRANCH}`, {
+              headers: { 'Authorization': `token ${token}` }
+          });
+          if (!res.ok) throw new Error('Could not list files to delete.');
+
+          const filesToDelete = await res.json();
+          if (filesToDelete.length === 0) {
+              statusDiv.textContent = `The /${folderPath} folder is already empty.`;
+              return;
+          }
+
+          const deletePromises = filesToDelete.map(file => 
+              fetch(file.url, {
+                  method: 'DELETE',
+                  headers: {
+                      'Authorization': `token ${token}`,
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ message: `Delete ${file.name}`, sha: file.sha, branch: BRANCH })
+              })
+          );
+          
+          await Promise.all(deletePromises);
+          statusDiv.textContent = `Successfully deleted ${filesToDelete.length} files from /${folderPath}.`;
+          statusDiv.className = 'status-success';
+
+      } catch (error) {
+          statusDiv.textContent = `Error: ${error.message}`;
+          statusDiv.className = 'status-error';
+      } finally {
+          if (folderPath === 'images') loadImages();
+          if (folderPath === 'returns') loadCSV();
+      }
   }
 
   async function downloadAll() {
@@ -84,92 +334,34 @@
       return;
     }
     for (const file of fileList) {
-      const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/images/${file.name}`;
-      const res = await fetch(url);
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = blobUrl;
+      a.href = file.download_url;
       a.download = file.name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 200));
     }
   }
-
-  async function loadCSV() {
-    const container = document.getElementById('csvLinks');
-    const fileName = `report-${todayStr}.csv`;
-    const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/returns/${fileName}`;
-    try {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Not found');
-      const text = await res.text();
-      const rows = text.trim().split('\n').map(line => line.split(','));
-      const table = document.createElement('table');
-      rows.forEach((row, idx) => {
-        const tr = document.createElement('tr');
-        row.forEach(cell => {
-          const el = document.createElement(idx === 0 ? 'th' : 'td');
-          el.textContent = cell;
-          tr.appendChild(el);
-        });
-        table.appendChild(tr);
-      });
-      container.innerHTML = '';
-      container.appendChild(table);
-    } catch (err) {
-      container.textContent = 'No returns yet for today';
-    }
-  }
-
-  loadImages();
-  loadCSV();
 </script>
 
 <script>
-
-  function getToken() {
-    return localStorage.getItem('githubToken') || '';
-  }
-
-  function storeToken() {
-    const token = document.getElementById('tokenInput').value;
-    localStorage.setItem('githubToken', token);
-  }
-
-  function clearToken() {
-    localStorage.removeItem('githubToken');
-    document.getElementById('tokenInput').value = '';
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('tokenInput').value = getToken();
-    renderTerminals();
-  });
-
+  // This is the existing navigation indicator script, unchanged.
   const navLinks = document.querySelectorAll('.nav-link');
   const indicator = document.querySelector('.nav-indicator');
-
   function updateIndicator(link) {
     const rect = link.getBoundingClientRect();
     const navRect = link.parentElement.getBoundingClientRect();
-
     indicator.style.width = `${rect.width}px`;
     indicator.style.left = `${rect.left - navRect.left}px`;
   }
-
   navLinks.forEach(link => {
     link.addEventListener('mouseenter', () => updateIndicator(link));
   });
-
-  // Highlight based on current page
   window.addEventListener('DOMContentLoaded', () => {
     const active = Array.from(navLinks).find(link =>
-      link.href === window.location.href
-    ) || navLinks[0];
+      window.location.href.includes(link.href.split('/').pop())
+    ) || navLinks[2];
     updateIndicator(active);
   });
 </script>
